@@ -4,6 +4,7 @@ using Backend.Dtos.Requests.User;
 using Backend.Dtos.Responses;
 using Backend.Dtos.Responses.User;
 using Backend.Services.Interfaces;
+using Microsoft.AspNetCore.Identity.Data;
 
 namespace Backend.Services
 {
@@ -179,6 +180,37 @@ namespace Backend.Services
             catch (Exception ex)
             {
                 return ApiResponse<UserResponse>.InternalServerError($"Erro ao atualizar usuário: {ex.Message}");
+            }
+        }
+
+        internal async Task<ApiResponse<TokenResponse>> LoginAsync(LoginRequest loginDto)
+        {
+            try
+            {
+                var usuario = await _repository.GetByEmailAsync(loginDto.Email);
+                if (usuario == null || !BCrypt.Net.BCrypt.Verify(loginDto.Password, usuario.Password))
+                    return ApiResponse<TokenResponse>.BadRequest("Email ou senha inválidos");
+
+                var token = _jwtService.GenerateToken(usuario);
+
+                var loginResponse = new TokenResponse
+                {
+                    Token = token,
+                    UserResponse = new UserResponse
+                    {
+                        Id = usuario.Id,
+                        Name = usuario.Name,
+                        Email = usuario.Email,
+                        Created_At = usuario.Created_At,
+                        Active = usuario.Active
+                    }
+                };
+
+                return ApiResponse<TokenResponse>.Ok(loginResponse, "Login realizado com sucesso");
+            }
+            catch (Exception ex)
+            {
+                return ApiResponse<TokenResponse>.InternalServerError($"Erro ao realizar login: {ex.Message}");
             }
         }
     }
